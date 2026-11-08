@@ -1,1 +1,53 @@
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
+
+/* Dark Navy Cinema Theme */
+
+@theme {
+  --color-bg: #0B1220;
+  --color-surface: #151F30;
+  --color-card: #1E293B;
+  --color-line: #334155;
+
+  --color-ink: #FFFFFF;
+  --color-muted: #94A3B8;
+
+  --color-primary: #D10D32;
+  --color-primary-hover: #A90B29;
+
+  --color-danger: #EF4444;
+  --color-success: #22C55E;
+
+  --shadow-glow: 0 8px 24px rgba(209, 13, 50, 0.25);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bg font-sans text-ink antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(209 13 50 / 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
