@@ -31,3 +31,14 @@ export const validateCreateAdmin = (v) => {
   if (v.password.length < 8) errors.password = "Password must be at least 8 characters.";
   return errors;
 };
+
+// Guest checkout: the backend requires name, email and phone.
+export const validateGuest = (v) => {
+  const errors = {};
+  if (!v.name.trim()) errors.name = "Enter your full name.";
+  if (!v.email.trim()) errors.email = "Enter your email address.";
+  else if (!EMAIL.test(v.email.trim())) errors.email = "Enter a valid email address.";
+  if (!v.phone.trim()) errors.phone = "Enter your phone number.";
+  else if (!PHONE.test(v.phone.trim())) errors.phone = "Enter a valid phone number.";
+  return errors;
+};

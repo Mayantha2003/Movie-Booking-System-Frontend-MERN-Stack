@@ -150,6 +150,8 @@ const QuickBook = ({ movies = [] }) => {
     if (!quick.movieId || !quick.showtimeId) return;
 
     navigate(`/movies/${quick.movieId}`);
+    // The showtime is already chosen here, so skip straight to seat selection.
+    navigate(`/booking/${quick.showtimeId}/seats`);
   };
 
   return (

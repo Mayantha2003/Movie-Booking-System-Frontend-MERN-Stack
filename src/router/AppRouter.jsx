@@ -9,6 +9,10 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Profile from "../pages/Profile";
 import NotFound from "../pages/NotFound";
+import MovieDetails from "../pages/MovieDetails";
+import SeatSelection from "../pages/SeatSelection";
+import BookingSummary from "../pages/BookingSummary";
+import BookingConfirmation from "../pages/BookingConfirmation";
 
 import AdminLogin from "../pages/AdminLogin";
 import AdminLayout from "../components/admin/AdminLayout";
@@ -36,6 +40,12 @@ export default function AppRouter() {
         element={<ProtectedRoute roles={[ROLES.USER]} allowGuests />}
       >
         <Route path="/" element={<Home />} />
+
+        {/* Booking flow: guests and customers can both book */}
+        <Route path="/movies/:movieId" element={<MovieDetails />} />
+        <Route path="/booking/:showtimeId/seats" element={<SeatSelection />} />
+        <Route path="/booking/:showtimeId/summary" element={<BookingSummary />} />
+        <Route path="/booking/confirmation/:code" element={<BookingConfirmation />} />
       </Route>
 
       {/* Login pages: guests only. A logged-in user is redirected by role. */}

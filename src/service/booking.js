@@ -1,20 +1,5 @@
 import api from "./api";
 
-// POST /bookings  (works for guests AND logged-in users)
-//
-// bookingData = {
-//   showtimeId,
-//   seats: [{ row: "B", seatNumber: 8, seatId: "B-8" }],
-//   foodItems: [{ foodId, quantity }],      // optional
-//   offerCode: "SAVE20",                    // optional
-//   guestInfo: { name, email, phone },      // required only for guests
-// }
-//
-// The Authorization header is added automatically when the user is logged in.
-// An expired token is refreshed and the request is retried with the same body,
-// so selected seats are never lost.
-// skipAuthRedirect keeps the user on the checkout page if the session cannot
-// be renewed; the UI can show the error and offer a login instead.
 export const createBooking = async (bookingData) => {
   const response = await api.post("/bookings", bookingData, {
     skipAuthRedirect: true,
