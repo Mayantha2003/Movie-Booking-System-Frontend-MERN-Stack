@@ -137,8 +137,18 @@ export interface Offer {
 export type OfferRef = Pick<Offer, "_id" | "code"> &
   Partial<Pick<Offer, "description" | "discountType" | "discountValue">>;
 
-export type PaymentStatus = "Pending" | "Paid" | "Failed" | "Refunded";
-export type BookingStatus = "Confirmed" | "Cancelled" | "Completed";
+export type PaymentStatus =
+  | "Pending"
+  | "Paid"
+  | "Failed"
+  | "Cancelled"
+  | "Refunded";
+export type BookingStatus = "Pending" | "Confirmed" | "Cancelled" | "Completed";
+export type GatewayPaymentStatus =
+  | "PENDING"
+  | "SUCCESS"
+  | "FAILED"
+  | "CANCELLED";
 
 export interface GuestInfo {
   name: string;
@@ -173,6 +183,7 @@ export interface Booking {
   finalAmount: number;
   paymentStatus: PaymentStatus;
   bookingStatus: BookingStatus;
+  holdExpiresAt?: string | null;
   bookedAt: string;
   createdAt: string;
   updatedAt: string;
@@ -184,6 +195,29 @@ export interface CreateBookingPayload {
   foodItems?: { foodId: string; quantity: number }[];
   offerCode?: string;
   guestInfo?: GuestInfo;
+}
+
+export interface CreateBookingResponse extends ApiResponse<Booking> {
+  paymentToken: string;
+}
+
+export interface PayHereCheckout {
+  orderId: string;
+  attempt: number;
+  attemptsLeft: number;
+  holdExpiresAt: string;
+  checkout: {
+    action: string;
+    fields: Record<string, string>;
+  };
+}
+
+export interface PaymentStatusResponse {
+  orderId: string;
+  status: GatewayPaymentStatus;
+  bookingStatus: BookingStatus | null;
+  holdExpiresAt: string | null;
+  attemptsLeft: number;
 }
 
 export type UserStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";

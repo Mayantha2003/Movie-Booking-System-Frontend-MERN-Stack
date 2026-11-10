@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import useAuth from "../hooks/useAuth";
@@ -6,6 +6,15 @@ import useRemote from "../hooks/useRemote";
 import useNow from "../hooks/useNow";
 import { getShowtimeById, getBookedSeats } from "../service/showtime";
 import { createBooking } from "../service/booking";
+import {
+  canPersistPaymentSession,
+  clearPendingPaymentSession,
+  createPaymentCheckout,
+  getPendingPaymentSession,
+  savePendingPaymentSession,
+  submitPayHereCheckout,
+  type PendingPaymentSession,
+} from "../service/payment";
 import { getErrorMessage } from "../service/errorMessage";
 import { isLapsed, parseSeatIds, seatPayload, sortSeatIds } from "../utils/booking";
 import { validateGuest } from "../utils/validators";
@@ -49,6 +58,9 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
   const [serverError, setServerError] = useState("");
   const [takenSeats, setTakenSeats] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingPayment, setPendingPayment] =
+    useState<PendingPaymentSession | null>(() => getPendingPaymentSession());
+  const submittingRef = useRef(false);
 
   const fetchAll = useCallback(async () => {
     const { data: showtime } = await getShowtimeById(showtimeId);
@@ -90,7 +102,13 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
 
   const bookedSeats = data?.booked ?? [];
   const closed = showtime.isActive === false || isLapsed(showtime, now);
-  const alreadyTaken = [...new Set([...takenSeats, ...seatIds.filter((id) => bookedSeats.includes(id))])].filter((id) => seatIds.includes(id));
+  const matchingPendingPayment =
+    pendingPayment?.showtimeId === showtimeId &&
+    pendingPayment.seatIds.length === seatIds.length &&
+    pendingPayment.seatIds.every((id, index) => id === seatIds[index]);
+  const alreadyTaken = matchingPendingPayment
+    ? []
+    : [...new Set([...takenSeats, ...seatIds.filter((id) => bookedSeats.includes(id))])].filter((id) => seatIds.includes(id));
   const remaining = seatIds.filter((id) => !alreadyTaken.includes(id));
   const movieId = typeof showtime.movie === "string" ? "" : showtime.movie?._id ?? "";
 
@@ -118,8 +136,58 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
     if (errors[name]) setErrors((er) => ({ ...er, [name]: undefined }));
   };
 
+  const startCheckout = async (session: PendingPaymentSession) => {
+    if (session.orderId) {
+      navigate(`/payment/return?order_id=${encodeURIComponent(session.orderId)}`);
+      return;
+    }
+
+    const checkout = await createPaymentCheckout(
+      session.bookingCode,
+      session.paymentToken
+    );
+    const updatedSession = { ...session, orderId: checkout.orderId };
+    setPendingPayment(updatedSession);
+    savePendingPaymentSession(updatedSession);
+    submitPayHereCheckout(checkout.checkout);
+  };
+
   const handleConfirm = async () => {
     setServerError("");
+
+    if (submittingRef.current) return;
+
+    if (matchingPendingPayment && pendingPayment) {
+      submittingRef.current = true;
+      setSubmitting(true);
+      try {
+        await startCheckout(pendingPayment);
+      } catch (err) {
+        const statusCode = (err as { response?: { status?: number } }).response?.status;
+        const code = (
+          err as { response?: { data?: { code?: string } } }
+        ).response?.data?.code;
+        if (code === "ATTEMPT_IN_PROGRESS") {
+          const orderId = `PH-${pendingPayment.bookingCode.toUpperCase()}-1`;
+          const updatedSession = { ...pendingPayment, orderId };
+          savePendingPaymentSession(updatedSession);
+          setPendingPayment(updatedSession);
+          navigate(`/payment/return?order_id=${encodeURIComponent(orderId)}`);
+          return;
+        }
+        if (statusCode === 403 || statusCode === 410) {
+          clearPendingPaymentSession(pendingPayment.bookingCode);
+          setPendingPayment(null);
+        }
+        setServerError(
+          getErrorMessage(err, "We couldn't start payment. Your seat hold may have expired.")
+        );
+      } finally {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
+      return;
+    }
 
     if (!isAuthenticated) {
       const found = validateGuest(guest);
@@ -127,6 +195,14 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
       if (Object.keys(found).length) return;
     }
 
+    if (!canPersistPaymentSession()) {
+      setServerError(
+        "This browser cannot temporarily store your payment session. Enable session storage and try again."
+      );
+      return;
+    }
+
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const payload: CreateBookingPayload = {
@@ -143,7 +219,19 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
       }
 
       const res = await createBooking(payload);
-      navigate(`/booking/confirmation/${res.data.bookingCode}`, { replace: true });
+      if (!res.paymentToken || !res.data.bookingCode || !res.data.holdExpiresAt) {
+        throw new Error("The booking response was missing payment details.");
+      }
+      const session: PendingPaymentSession = {
+        bookingCode: res.data.bookingCode,
+        paymentToken: res.paymentToken,
+        holdExpiresAt: res.data.holdExpiresAt,
+        showtimeId,
+        seatIds,
+      };
+      setPendingPayment(session);
+      savePendingPaymentSession(session);
+      await startCheckout(session);
     } catch (err) {
       const responseData = (err as { response?: { data?: { unavailableSeats?: string[] } } }).response?.data;
       const taken = responseData?.unavailableSeats;
@@ -152,6 +240,7 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
       }
       setServerError(getErrorMessage(err, "We couldn't complete your booking. Please try again."));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -208,8 +297,13 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
 
             <Panel title="Payment">
               <p className="text-sm leading-6 text-muted">
-                Your booking is confirmed as soon as you submit it. Online payment isn&apos;t enabled yet, so the payment status will show as <span className="font-semibold text-amber-300">Pending</span>.
+                Your seats will be held temporarily while you complete secure payment with PayHere. Your booking is confirmed only after the payment is verified.
               </p>
+              {matchingPendingPayment && (
+                <p className="mt-3 text-sm font-semibold text-amber-300">
+                  You already have a pending hold for these seats. Continue checkout without creating another booking.
+                </p>
+              )}
             </Panel>
           </div>
 
@@ -220,7 +314,11 @@ function BookingSummaryContent({ showtimeId }: BookingSummaryProps) {
               </div>
             )}
             <Button onClick={handleConfirm} loading={submitting} disabled={hasConflict} size="lg" className="w-full">
-              Confirm booking
+              {matchingPendingPayment
+                ? pendingPayment?.orderId
+                  ? "Check payment status"
+                  : "Continue to payment"
+                : "Continue to payment"}
             </Button>
           </OrderSummary>
         </div>

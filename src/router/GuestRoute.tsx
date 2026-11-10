@@ -1,12 +1,17 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
+import { resolvePostLoginPath, type FromLocation } from "../utils/roles";
 import { LoadingState } from "../components/common/StateViews";
 
 export default function GuestRoute() {
-  const { isAuthenticated, initializing } = useAuth();
+  const { user, initializing } = useAuth();
+  const location = useLocation();
 
   if (initializing) return <LoadingState label="Loading…" fullScreen />;
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (user) {
+    const from = (location.state as { from?: FromLocation } | null)?.from;
+    return <Navigate to={resolvePostLoginPath(user.role, from)} replace />;
+  }
 
   return <Outlet />;
 }

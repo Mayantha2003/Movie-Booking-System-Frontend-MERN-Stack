@@ -13,6 +13,7 @@ const PAYMENT_TONE: Record<Booking["paymentStatus"], "green" | "amber" | "red" |
   Paid: "green",
   Pending: "amber",
   Failed: "red",
+  Cancelled: "gray",
   Refunded: "blue",
 };
 

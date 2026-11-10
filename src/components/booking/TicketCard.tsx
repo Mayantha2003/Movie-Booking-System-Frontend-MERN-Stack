@@ -58,6 +58,10 @@ export default function TicketCard({ booking }: { booking: BookingTicket }) {
   const seatIds = sortSeatIds((booking.seats || []).map((s) => s.seatId));
   const day = describeDay(showDayKey(showtime?.showDate ?? ""));
   const qrValue = `${window.location.origin}/booking/confirmation/${booking.bookingCode}`;
+  const ticketConfirmed =
+    (booking.bookingStatus === "Confirmed" ||
+      booking.bookingStatus === "Completed") &&
+    booking.paymentStatus === "Paid";
 
   const copyCode = async () => {
     try {
@@ -138,9 +142,15 @@ export default function TicketCard({ booking }: { booking: BookingTicket }) {
           <span aria-hidden="true" className="absolute -top-3 left-1/2 hidden size-6 -translate-x-1/2 rounded-full bg-bg max-lg:block" />
           <span aria-hidden="true" className="absolute -left-3 top-1/2 hidden size-6 -translate-y-1/2 rounded-full bg-bg lg:block" />
 
-          <div className="rounded-2xl bg-white p-3">
-            <QRCodeSVG value={qrValue} size={160} level="M" aria-label={`QR code for booking ${booking.bookingCode}`} />
-          </div>
+          {ticketConfirmed ? (
+            <div className="rounded-2xl bg-white p-3">
+              <QRCodeSVG value={qrValue} size={160} level="M" aria-label={`QR code for booking ${booking.bookingCode}`} />
+            </div>
+          ) : (
+            <p className="max-w-52 text-sm text-muted">
+              A ticket QR code will be available after the payment is verified.
+            </p>
+          )}
 
           <div>
             <p className="text-xs text-muted">Booking ID</p>

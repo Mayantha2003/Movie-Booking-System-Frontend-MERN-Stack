@@ -54,6 +54,11 @@ function BookingConfirmationContent({ code }: BookingConfirmationProps) {
   }
 
   const cancelled = booking.bookingStatus === "Cancelled";
+  const confirmed =
+    (booking.bookingStatus === "Confirmed" ||
+      booking.bookingStatus === "Completed") &&
+    booking.paymentStatus === "Paid";
+  const pending = booking.bookingStatus === "Pending";
 
   return (
     <BookingShell>
@@ -61,14 +66,32 @@ function BookingConfirmationContent({ code }: BookingConfirmationProps) {
 
       <div className="mx-auto max-w-[1000px] px-4 py-10 sm:px-6">
         <div className="mb-8 text-center">
-          <span className={`mx-auto grid size-16 place-items-center rounded-full ${cancelled ? "bg-danger/15 text-danger" : "bg-success/15 text-success"}`}>
-            {cancelled ? <span className="text-3xl" aria-hidden="true">×</span> : <Check />}
+          <span className={`mx-auto grid size-16 place-items-center rounded-full ${
+            cancelled
+              ? "bg-danger/15 text-danger"
+              : confirmed
+                ? "bg-success/15 text-success"
+                : "bg-amber-400/15 text-amber-300"
+          }`}>
+            {cancelled ? <span className="text-3xl" aria-hidden="true">×</span> : confirmed ? <Check /> : <span aria-hidden="true">…</span>}
           </span>
-          <h1 className="mt-5 text-3xl font-extrabold">{cancelled ? "This booking was cancelled" : "Booking confirmed"}</h1>
+          <h1 className="mt-5 text-3xl font-extrabold">
+            {cancelled
+              ? "This booking was cancelled"
+              : confirmed
+                ? "Booking confirmed"
+                : pending
+                  ? "Payment pending"
+                  : "Booking not confirmed"}
+          </h1>
           <p className="mt-2 text-sm text-muted">
             {cancelled
               ? "The seats have been released."
-              : "Keep your booking ID or QR code handy. You'll need it at the cinema."}
+              : confirmed
+                ? "Keep your booking ID or QR code handy. You'll need it at the cinema."
+                : pending
+                  ? "Your seats are temporarily held while payment is being completed. This is not a ticket yet."
+                  : "This booking has not been confirmed. Check the payment status before using it as a ticket."}
           </p>
         </div>
 

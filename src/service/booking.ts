@@ -1,12 +1,19 @@
 import api from "./api";
-import type { ApiResponse, Booking, CreateBookingPayload } from "../types/api";
+import type {
+  ApiResponse,
+  Booking,
+  CreateBookingPayload,
+  CreateBookingResponse,
+} from "../types/api";
 
 export const createBooking = async (
   bookingData: CreateBookingPayload
-): Promise<ApiResponse<Booking>> => {
-  const response = await api.post<ApiResponse<Booking>>("/bookings", bookingData, {
-    skipAuthRedirect: true,
-  });
+): Promise<CreateBookingResponse> => {
+  const response = await api.post<CreateBookingResponse>(
+    "/bookings",
+    bookingData,
+    { skipAuthRedirect: true }
+  );
   return response.data;
 };
 

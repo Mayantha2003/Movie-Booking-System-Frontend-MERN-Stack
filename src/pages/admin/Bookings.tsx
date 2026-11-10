@@ -12,9 +12,11 @@ const PAYMENT_TONE: Record<PaymentStatus, "green" | "amber" | "red" | "blue" | "
   Paid: "green",
   Pending: "amber",
   Failed: "red",
+  Cancelled: "gray",
   Refunded: "blue",
 };
-const STATUS_TONE: Record<BookingStatus, "green" | "blue" | "gray"> = {
+const STATUS_TONE: Record<BookingStatus, "green" | "blue" | "gray" | "amber"> = {
+  Pending: "amber",
   Confirmed: "green",
   Completed: "blue",
   Cancelled: "gray",
@@ -153,11 +155,11 @@ export default function Bookings() {
             className={`${selectCls} w-full placeholder:text-gray-500 sm:w-64`} />
           <select value={bookingStatus} onChange={(e) => setBookingStatus(e.target.value)} aria-label="Filter by status" className={`${selectCls} flex-1 sm:flex-none`}>
             <option value="">All statuses</option>
-            <option>Confirmed</option><option>Completed</option><option>Cancelled</option>
+            <option>Pending</option><option>Confirmed</option><option>Completed</option><option>Cancelled</option>
           </select>
           <select value={payment} onChange={(e) => setPayment(e.target.value)} aria-label="Filter by payment" className={`${selectCls} flex-1 sm:flex-none`}>
             <option value="">All payments</option>
-            <option>Paid</option><option>Pending</option><option>Failed</option><option>Refunded</option>
+            <option>Paid</option><option>Pending</option><option>Failed</option><option>Cancelled</option><option>Refunded</option>
           </select>
         </div>
 

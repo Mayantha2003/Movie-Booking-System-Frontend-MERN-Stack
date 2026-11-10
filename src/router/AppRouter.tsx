@@ -13,6 +13,7 @@ import MovieDetails from "../pages/MovieDetails";
 import SeatSelection from "../pages/SeatSelection";
 import BookingSummary from "../pages/BookingSummary";
 import BookingConfirmation from "../pages/BookingConfirmation";
+import PaymentResult from "../pages/PaymentResult";
 
 import AdminLogin from "../pages/AdminLogin";
 import AdminLayout from "../components/admin/AdminLayout";
@@ -33,6 +34,9 @@ import ManageAdmins from "../pages/ManageAdmins";
 export default function AppRouter() {
   return (
     <Routes>
+      <Route path="/payment/return" element={<PaymentResult />} />
+      <Route path="/payment/cancelled" element={<PaymentResult />} />
+
       <Route element={<ProtectedRoute roles={[ROLES.USER]} allowGuests />}>
         <Route path="/" element={<Home />} />
         <Route path="/movies/:movieId" element={<MovieDetails />} />
