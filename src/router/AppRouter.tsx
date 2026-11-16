@@ -13,6 +13,7 @@ import MovieDetails from "../pages/MovieDetails";
 import SeatSelection from "../pages/SeatSelection";
 import BookingSummary from "../pages/BookingSummary";
 import BookingConfirmation from "../pages/BookingConfirmation";
+import DemoCardPayment from "../pages/DemoCardPayment";
 import PaymentResult from "../pages/PaymentResult";
 
 import AdminLogin from "../pages/AdminLogin";
@@ -34,6 +35,7 @@ import ManageAdmins from "../pages/ManageAdmins";
 export default function AppRouter() {
   return (
     <Routes>
+      <Route path="/payment/demo" element={<DemoCardPayment />} />
       <Route path="/payment/return" element={<PaymentResult />} />
       <Route path="/payment/cancelled" element={<PaymentResult />} />
 

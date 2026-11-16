@@ -1,304 +1,330 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { useMemo, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+
 import BookingShell from "../components/booking/BookingShell";
-import Button from "../components/common/Button";
 import Banner from "../components/auth/Banner";
-import { getErrorMessage } from "../service/errorMessage";
 import {
   clearPendingPaymentSession,
-  createPaymentCheckout,
-  getPaymentStatus,
   getPendingPaymentSession,
-  isValidPaymentOrderId,
-  savePendingPaymentSession,
-  submitPayHereCheckout,
+  submitDemoCardPayment,
 } from "../service/payment";
-import type { PaymentStatusResponse } from "../types/api";
+import { getErrorMessage } from "../service/errorMessage";
 
-const ORDER_BOOKING_CODE =
-  /^PH-(BK-(?:[A-HJ-NP-Z2-9]{6}|[A-HJ-NP-Z2-9]{26}))-[1-3]$/i;
-const MAX_STATUS_CHECKS = 15;
-const STATUS_POLL_INTERVAL_MS = 2_000;
+const formatCardNumber = (value: string) =>
+  value.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
 
-const nextOrderId = (currentOrderId: string, bookingCode: string): string => {
-  const currentAttempt = Number(currentOrderId.slice(currentOrderId.lastIndexOf("-") + 1));
-  return `PH-${bookingCode}-${currentAttempt + 1}`;
+const isValidCardNumber = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length < 13 || digits.length > 19) return false;
+
+  let sum = 0;
+  let doubleDigit = false;
+
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let digit = Number(digits[i]);
+
+    if (doubleDigit) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+
+    sum += digit;
+    doubleDigit = !doubleDigit;
+  }
+
+  return sum % 10 === 0;
 };
 
-const isResolved = (status: PaymentStatusResponse): boolean => {
-  if (status.bookingStatus === "Cancelled") return true;
-  if (status.status === "FAILED" || status.status === "CANCELLED") return true;
-  return (
-    status.status === "SUCCESS" &&
-    (status.bookingStatus === "Confirmed" || status.bookingStatus === "Completed")
-  );
+const isValidExpiry = (value: string) => {
+  if (!/^\d{2}\/\d{2}$/.test(value)) return false;
+
+  const [monthText, yearText] = value.split("/");
+  const month = Number(monthText);
+  const year = 2000 + Number(yearText);
+
+  if (month < 1 || month > 12) return false;
+
+  const now = new Date();
+  const currentMonth = now.getFullYear() * 12 + now.getMonth();
+  const expiryMonth = year * 12 + month - 1;
+
+  return expiryMonth >= currentMonth;
 };
 
 export default function PaymentResult() {
-  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get("order_id")?.trim().toUpperCase() ?? "";
-  const isCancellationReturn = location.pathname === "/payment/cancelled";
-  const [payment, setPayment] = useState<PaymentStatusResponse | null>(null);
-  const [error, setError] = useState("");
-  const [checking, setChecking] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
-  const [retrying, setRetrying] = useState(false);
-  const [refreshNumber, setRefreshNumber] = useState(0);
-  const retryingRef = useRef(false);
 
-  const bookingCode = useMemo(
-    () => ORDER_BOOKING_CODE.exec(orderId)?.[1]?.toUpperCase() ?? null,
-    [orderId]
+  const bookingCode = searchParams.get("bookingCode")?.toUpperCase() ?? "";
+
+  const session = useMemo(
+    () => getPendingPaymentSession(),
+    []
   );
 
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-    let checkCount = 0;
+  const validSession =
+    !!session &&
+    session.bookingCode.toUpperCase() === bookingCode;
 
-    setPayment(null);
-    setError("");
-    setChecking(false);
-    setTimedOut(false);
+  const [cardHolderName, setCardHolderName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [error, setError] = useState("");
+  const [processing, setProcessing] = useState(false);
 
-    if (!isValidPaymentOrderId(orderId)) {
-      setError("This payment return link is invalid.");
-      return () => {
-        active = false;
-      };
-    }
+  const handleExpiryChange = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 4);
 
-    const checkStatus = async () => {
-      if (!active) return;
-      setChecking(true);
-      try {
-        const result = await getPaymentStatus(orderId);
-        if (!active) return;
-        setPayment(result);
-        setError("");
-
-        if (result.bookingStatus === "Cancelled" && bookingCode) {
-          clearPendingPaymentSession(bookingCode);
-        } else if (
-          result.status === "SUCCESS" &&
-          (result.bookingStatus === "Confirmed" ||
-            result.bookingStatus === "Completed") &&
-          bookingCode
-        ) {
-          clearPendingPaymentSession(bookingCode);
-        }
-
-        if (isResolved(result)) {
-          setChecking(false);
-          return;
-        }
-      } catch (requestError) {
-        if (!active) return;
-        setError(
-          getErrorMessage(
-            requestError,
-            "We couldn't check payment status. Please try again."
-          )
-        );
-        setChecking(false);
-        return;
-      }
-
-      checkCount += 1;
-      if (checkCount >= MAX_STATUS_CHECKS) {
-        setChecking(false);
-        setTimedOut(true);
-        return;
-      }
-      timer = window.setTimeout(checkStatus, STATUS_POLL_INTERVAL_MS);
-    };
-
-    void checkStatus();
-    return () => {
-      active = false;
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-  }, [bookingCode, orderId, refreshNumber]);
-
-  const holdActive =
-    payment?.bookingStatus === "Pending" &&
-    !!payment.holdExpiresAt &&
-    Date.parse(payment.holdExpiresAt) > Date.now();
-  const confirmed =
-    payment?.status === "SUCCESS" &&
-    (payment.bookingStatus === "Confirmed" ||
-      payment.bookingStatus === "Completed");
-  const savedSession = getPendingPaymentSession();
-  const hasSavedRetryToken =
-    !!bookingCode &&
-    savedSession?.bookingCode.toUpperCase() === bookingCode;
-  const retryAvailableFromServer =
-    !!payment &&
-    payment.attemptsLeft > 0 &&
-    holdActive &&
-    (payment.status === "FAILED" || payment.status === "CANCELLED");
-  const canRetry =
-    retryAvailableFromServer && hasSavedRetryToken;
-
-  const handleRetry = async () => {
-    if (!bookingCode || !canRetry || retryingRef.current) return;
-    retryingRef.current = true;
-    setRetrying(true);
-    setError("");
-    try {
-      const session = getPendingPaymentSession();
-      if (!session || session.bookingCode.toUpperCase() !== bookingCode) {
-        throw new Error(
-          "The secure payment link is no longer available in this browser. Please start a new booking."
-        );
-      }
-      const retryOrderId = nextOrderId(orderId, bookingCode);
-      savePendingPaymentSession({ ...session, orderId: retryOrderId });
-      const checkout = await createPaymentCheckout(
-        session.bookingCode,
-        session.paymentToken
-      );
-      savePendingPaymentSession({ ...session, orderId: checkout.orderId });
-      submitPayHereCheckout(checkout.checkout);
-    } catch (retryError) {
-      const statusCode = (
-        retryError as { response?: { status?: number } }
-      ).response?.status;
-      const responseCode = (
-        retryError as { response?: { data?: { code?: string } } }
-      ).response?.data?.code;
-      if (responseCode === "ATTEMPT_IN_PROGRESS") {
-        const retryOrderId = nextOrderId(orderId, bookingCode);
-        window.location.assign(
-          `/payment/return?order_id=${encodeURIComponent(retryOrderId)}`
-        );
-        return;
-      }
-      if (statusCode === 403 || statusCode === 410) {
-        clearPendingPaymentSession(bookingCode);
-      }
-      setError(
-        getErrorMessage(retryError, "We couldn't restart the payment.")
-      );
-    } finally {
-      retryingRef.current = false;
-      setRetrying(false);
+    if (digits.length <= 2) {
+      setExpiry(digits);
+    } else {
+      setExpiry(`${digits.slice(0, 2)}/${digits.slice(2)}`);
     }
   };
 
-  let heading = "Checking your payment";
-  let description =
-    "We’re waiting for the payment provider to confirm the result. This page checks the booking server; the redirect itself is not proof of payment.";
+  const handlePayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
 
-  if (confirmed) {
-    heading = "Payment confirmed";
-    description = "The backend verified your payment and confirmed your booking.";
-  } else if (payment?.status === "SUCCESS") {
-    heading = "Payment received; booking not confirmed";
-    description =
-      "The payment provider reports a successful charge, but the booking server has not confirmed the seats. Do not treat this as a ticket; contact support for assistance.";
-  } else if (payment?.bookingStatus === "Cancelled") {
-    heading = "Booking cancelled";
-    description =
-      payment.status === "PENDING"
-        ? "The booking has been cancelled and its seats released. The final payment result is still being checked."
-        : "The booking was cancelled and its seats have been released.";
-  } else if (payment?.status === "FAILED") {
-    heading = "Payment failed";
-    description = canRetry
-      ? "Your seat hold is still active. You can try another payment attempt before it expires."
-      : retryAvailableFromServer
-        ? "Your seat hold is still active, but this browser no longer has the secure retry token."
-        : "This payment did not complete. The seat hold may have expired or all attempts may have been used.";
-  } else if (payment?.status === "CANCELLED") {
-    heading = isCancellationReturn ? "Payment cancelled" : "Payment was cancelled";
-    description = canRetry
-      ? "The payment was cancelled. Your seats are still held temporarily, so you can retry."
-      : retryAvailableFromServer
-        ? "Your seat hold is still active, but this browser no longer has the secure retry token."
-        : "The payment was cancelled and this booking can no longer be paid.";
-  } else if (payment?.status === "PENDING" && isCancellationReturn) {
-    heading = "Checking the cancelled checkout";
-    description =
-      "The return link does not cancel or confirm a payment. We’re checking the server notification before updating your booking.";
-  }
+    if (!validSession || !session) {
+      setError(
+        "Your secure booking session is unavailable. Please start a new booking."
+      );
+      return;
+    }
 
-  return (
-    <BookingShell>
-      <div className="mx-auto max-w-2xl px-4 py-14 sm:px-6">
-        <section className="rounded-2xl border border-line bg-surface p-6 text-center sm:p-9">
-          <div
-            aria-hidden="true"
-            className={`mx-auto grid size-14 place-items-center rounded-full text-2xl font-black ${
-              confirmed
-                ? "bg-success/15 text-success"
-                : payment?.status === "FAILED" ||
-                    payment?.status === "CANCELLED" ||
-                    payment?.bookingStatus === "Cancelled"
-                  ? "bg-danger/15 text-danger"
-                  : "bg-amber-400/15 text-amber-300"
-            }`}
-          >
-            {confirmed ? "✓" : payment?.status === "FAILED" ? "!" : "…"}
-          </div>
-          <h1 className="mt-5 text-2xl font-extrabold sm:text-3xl">{heading}</h1>
-          <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
+    if (
+      Date.parse(session.holdExpiresAt) <= Date.now()
+    ) {
+      clearPendingPaymentSession(bookingCode);
+      setError("Your seat hold has expired. Please select your seats again.");
+      return;
+    }
 
-          {orderId && (
-            <p className="mt-4 text-xs text-muted">
-              Payment reference: <span className="font-mono">{orderId}</span>
+    if (cardHolderName.trim().length < 3) {
+      setError("Please enter the cardholder name.");
+      return;
+    }
+
+    if (!isValidCardNumber(cardNumber)) {
+      setError("Please enter a valid demo card number.");
+      return;
+    }
+
+    if (!isValidExpiry(expiry)) {
+      setError("Please enter a valid future expiry date.");
+      return;
+    }
+
+    if (!/^\d{3,4}$/.test(cvv)) {
+      setError("Please enter a valid CVV.");
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      const result = await submitDemoCardPayment({
+        bookingCode: session.bookingCode,
+        paymentToken: session.paymentToken,
+      });
+
+      if (
+        result.bookingStatus !== "Confirmed" &&
+        result.bookingStatus !== "Completed"
+      ) {
+        throw new Error(
+          "Payment was not confirmed by the booking server. Please check your booking before trying again."
+        );
+      }
+
+      clearPendingPaymentSession(session.bookingCode);
+
+      navigate(
+        `/booking/confirmation/${encodeURIComponent(session.bookingCode)}`,
+        { replace: true }
+      );
+    } catch (err) {
+      setError(
+        getErrorMessage(
+          err,
+          "Demo payment failed. Please check your details and try again."
+        )
+      );
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (!validSession || !session) {
+    return (
+      <BookingShell>
+        <div className="mx-auto max-w-xl px-4 py-16">
+          <div className="rounded-2xl border border-line bg-surface p-7 text-center">
+            <h1 className="text-2xl font-extrabold">
+              Payment session unavailable
+            </h1>
+            <p className="mt-3 text-sm text-muted">
+              Your secure payment session is not available in this browser.
+              Please start a new booking.
             </p>
-          )}
-
-          {error && (
-            <div className="mt-5 text-left">
-              <Banner>{error}</Banner>
-            </div>
-          )}
-
-          {checking && (
-            <p className="mt-5 text-sm text-muted" role="status">
-              Checking payment status…
-            </p>
-          )}
-          {timedOut && !error && (
-            <p className="mt-5 text-sm text-amber-300" role="status">
-              The payment is still pending. You can check again shortly.
-            </p>
-          )}
-
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
-            {confirmed && bookingCode && (
-              <Link
-                to={`/booking/confirmation/${encodeURIComponent(bookingCode)}`}
-                className="inline-flex h-11 items-center rounded-lg bg-primary px-6 text-sm font-bold text-white transition hover:bg-primary-hover"
-              >
-                View confirmed booking
-              </Link>
-            )}
-            {canRetry && (
-              <Button onClick={handleRetry} loading={retrying}>
-                Retry payment
-              </Button>
-            )}
-            {!confirmed && (
-              <Button
-                variant="secondary"
-                onClick={() => setRefreshNumber((value) => value + 1)}
-                disabled={checking}
-              >
-                Check status again
-              </Button>
-            )}
             <Link
               to="/"
-              className="inline-flex h-11 items-center rounded-lg border border-line px-6 text-sm font-semibold transition hover:border-primary"
+              className="mt-6 inline-flex h-11 items-center rounded-lg bg-primary px-6 text-sm font-bold text-white"
             >
               Back to movies
             </Link>
           </div>
-        </section>
+        </div>
+      </BookingShell>
+    );
+  }
+
+  return (
+    <BookingShell>
+      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-xl">
+          <div className="border-b border-line p-6 sm:p-8">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-primary">
+                  SECURE DEMO CHECKOUT
+                </p>
+                <h1 className="mt-2 text-2xl font-extrabold sm:text-3xl">
+                  Card Payment
+                </h1>
+                <p className="mt-2 text-sm text-muted">
+                  Demonstration payment for your movie booking.
+                </p>
+              </div>
+              <span className="rounded-xl border border-line px-3 py-2 text-xs font-bold">
+                DEMO
+              </span>
+            </div>
+
+            <div className="mt-6 rounded-xl bg-background p-4">
+              <p className="text-xs text-muted">Booking reference</p>
+              <p className="mt-1 font-mono font-bold">{bookingCode}</p>
+              <p className="mt-3 text-xs text-muted">
+                Seat hold expires
+              </p>
+              <p className="mt-1 text-sm font-semibold">
+                {new Date(session.holdExpiresAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handlePayment} className="space-y-5 p-6 sm:p-8">
+            <div>
+              <h2 className="text-lg font-extrabold">
+                Card information
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Enter demonstration card details to complete the prototype.
+                No card details are sent to the payment server.
+              </p>
+            </div>
+
+            {error && (
+              <div role="alert">
+                <Banner>{error}</Banner>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold">
+                Cardholder name
+              </label>
+              <input
+                value={cardHolderName}
+                onChange={(e) => setCardHolderName(e.target.value)}
+                autoComplete="cc-name"
+                placeholder="Name on card"
+                maxLength={80}
+                className="h-12 w-full rounded-lg border border-line bg-background px-4 outline-none focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold">
+                Card number
+              </label>
+              <input
+                value={cardNumber}
+                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                inputMode="numeric"
+                autoComplete="cc-number"
+                placeholder="4242 4242 4242 4242"
+                className="h-12 w-full rounded-lg border border-line bg-background px-4 font-mono outline-none focus:border-primary"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  Expiry date
+                </label>
+                <input
+                  value={expiry}
+                  onChange={(e) => handleExpiryChange(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="cc-exp"
+                  placeholder="MM/YY"
+                  maxLength={5}
+                  className="h-12 w-full rounded-lg border border-line bg-background px-4 outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold">
+                  CVV
+                </label>
+                <input
+                  value={cvv}
+                  onChange={(e) =>
+                    setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))
+                  }
+                  inputMode="numeric"
+                  autoComplete="cc-csc"
+                  placeholder="123"
+                  maxLength={4}
+                  type="password"
+                  className="h-12 w-full rounded-lg border border-line bg-background px-4 outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-line p-4">
+              <p className="text-sm font-bold">
+                Demo card information
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                Card number: 4242 4242 4242 4242
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Expiry: Any future month and year
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                CVV: 123
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={processing}
+              className="flex h-12 w-full items-center justify-center rounded-lg bg-primary px-6 font-bold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {processing ? "Processing demo payment..." : "Pay securely"}
+            </button>
+
+            <p className="text-center text-xs leading-5 text-muted">
+              This is a demonstration payment interface. It does not charge
+              a real card or process real financial transactions.
+            </p>
+          </form>
+        </div>
       </div>
     </BookingShell>
   );
