@@ -2,6 +2,7 @@ import api from "./api";
 import type {
   ApiResponse,
   Booking,
+  BookingConfirmation,
   CreateBookingPayload,
   CreateBookingResponse,
 } from "../types/api";
@@ -17,8 +18,19 @@ export const createBooking = async (
   return response.data;
 };
 
-export const getBookingByCode = async (code: string): Promise<ApiResponse<Booking>> => {
-  const response = await api.get<ApiResponse<Booking>>(
+export const getBookingByCode = async (
+  code: string,
+  verification?: { email: string; phone: string }
+): Promise<ApiResponse<BookingConfirmation>> => {
+  if (verification) {
+    const response = await api.post<ApiResponse<BookingConfirmation>>(
+      `/bookings/code/${encodeURIComponent(code)}`,
+      verification
+    );
+    return response.data;
+  }
+
+  const response = await api.get<ApiResponse<BookingConfirmation>>(
     `/bookings/code/${encodeURIComponent(code)}`
   );
   return response.data;

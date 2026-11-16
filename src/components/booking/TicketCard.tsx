@@ -1,9 +1,11 @@
+
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import MoviePoster from "../movie/MoviePoster";
 import { describeDay, showDayKey, sortSeatIds } from "../../utils/booking";
 import { formatMoney, formatTime } from "../dashboard/format";
 import { formatDuration } from "../../utils/media";
+import type { BookingConfirmation } from "../../types/api";
 
 interface DetailProps {
   label: string;
@@ -28,36 +30,35 @@ const STATUS_STYLES = {
 } as const;
 
 const Status = ({ label, value }: { label: string; value: string }) => (
-  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${STATUS_STYLES[value as keyof typeof STATUS_STYLES] ?? STATUS_STYLES.Pending}`}>
+  <span
+    className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${
+      STATUS_STYLES[value as keyof typeof STATUS_STYLES] ??
+      STATUS_STYLES.Pending
+    }`}
+  >
     {label}: {value}
   </span>
 );
 
-interface BookingTicket {
-  bookingCode: string;
-  bookingStatus: string;
-  paymentStatus: string;
-  movie?: { title?: string; duration?: number };
-  cinema?: { name?: string; address?: string };
-  screen?: { name?: string; screenType?: string };
-  showtime?: { showDate?: string; startTime?: string };
-  seats?: Array<{ seatId: string }>;
-  totalSeats: number;
-  ticketPrice: number;
-  foodTotal?: number;
-  discountAmount?: number;
-  offer?: { code?: string } | null;
-  finalAmount: number;
-  guestInfo?: { name?: string; email?: string };
-}
-
-export default function TicketCard({ booking }: { booking: BookingTicket }) {
+export default function TicketCard({
+  booking,
+}: {
+  booking: BookingConfirmation;
+}) {
   const [copied, setCopied] = useState(false);
 
   const { movie, cinema, screen, showtime } = booking;
-  const seatIds = sortSeatIds((booking.seats || []).map((s) => s.seatId));
-  const day = describeDay(showDayKey(showtime?.showDate ?? ""));
+
+  const seatIds = sortSeatIds(
+    (booking.seats || []).map((s) => s.seatId)
+  );
+
+  const day = describeDay(
+    showDayKey(showtime?.showDate ?? "")
+  );
+
   const qrValue = `${window.location.origin}/booking/confirmation/${booking.bookingCode}`;
+
   const ticketConfirmed =
     (booking.bookingStatus === "Confirmed" ||
       booking.bookingStatus === "Completed") &&
@@ -76,75 +77,157 @@ export default function TicketCard({ booking }: { booking: BookingTicket }) {
   return (
     <article className="animate-ticket-in overflow-hidden rounded-3xl border border-line bg-surface shadow-2xl shadow-black/40">
       <div className="grid lg:grid-cols-[1fr_280px]">
+        {/* Ticket details */}
         <div className="p-6 sm:p-8">
           <div className="flex gap-5">
-            <MoviePoster movie={movie as never} className="aspect-[2/3] w-24 shrink-0 rounded-xl sm:w-28" />
+            <MoviePoster
+              movie={movie as never}
+              className="aspect-[2/3] w-24 shrink-0 rounded-xl sm:w-28"
+            />
+
             <div className="min-w-0">
-              <h2 className="text-xl font-extrabold leading-snug sm:text-2xl">{movie?.title}</h2>
-              <p className="mt-1 text-sm text-muted">{formatDuration(movie?.duration ?? 0)}</p>
+              <h2 className="text-xl font-extrabold leading-snug sm:text-2xl">
+                {movie?.title}
+              </h2>
+
+              <p className="mt-1 text-sm text-muted">
+                {formatDuration(movie?.duration ?? 0)}
+              </p>
+
               <div className="mt-3 flex flex-wrap gap-2">
-                <Status label="Booking" value={booking.bookingStatus} />
-                <Status label="Payment" value={booking.paymentStatus} />
+                <Status
+                  label="Booking"
+                  value={booking.bookingStatus}
+                />
+                <Status
+                  label="Payment"
+                  value={booking.paymentStatus}
+                />
               </div>
             </div>
           </div>
 
+          {/* Booking information */}
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-line pt-6 sm:grid-cols-3">
-            <Detail label="Cinema">{cinema?.name}</Detail>
+            <Detail label="Cinema">
+              {cinema?.name}
+            </Detail>
+
             <Detail label="Screen">
               {screen?.name}
-              {screen?.screenType && screen.screenType !== "Standard" ? ` (${screen.screenType})` : ""}
+              {screen?.screenType &&
+              screen.screenType !== "Standard"
+                ? ` (${screen.screenType})`
+                : ""}
             </Detail>
-            <Detail label="Date">{day.full}</Detail>
-            <Detail label="Time">{formatTime(showtime?.startTime ?? "")}</Detail>
-            <Detail label="Tickets">{booking.totalSeats}</Detail>
+
+            <Detail label="Date">
+              {day.full}
+            </Detail>
+
+            <Detail label="Time">
+              {formatTime(showtime?.startTime ?? "")}
+            </Detail>
+
+            <Detail label="Tickets">
+              {booking.totalSeats}
+            </Detail>
+
             <Detail label="Seats">
               <span className="flex flex-wrap gap-1.5">
                 {seatIds.map((id) => (
-                  <span key={id} className="rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary-hover">
+                  <span
+                    key={id}
+                    className="rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary-hover"
+                  >
                     {id}
                   </span>
                 ))}
               </span>
             </Detail>
-            {booking.guestInfo?.name && <Detail label="Booked by">{booking.guestInfo.name}</Detail>}
-            {booking.guestInfo?.email && <Detail label="Email">{booking.guestInfo.email}</Detail>}
-            {cinema?.address && <Detail label="Address">{cinema.address}</Detail>}
+
+            {booking.guestInfo?.name && (
+              <Detail label="Booked by">
+                {booking.guestInfo.name}
+              </Detail>
+            )}
+
+            {cinema?.address && (
+              <Detail label="Address">
+                {cinema.address}
+              </Detail>
+            )}
           </dl>
 
+          {/* Payment summary */}
           <div className="mt-7 space-y-2 border-t border-line pt-5 text-sm">
             <div className="flex justify-between text-muted">
               <span>
-                {booking.totalSeats} × {formatMoney(booking.ticketPrice)}
+                {booking.totalSeats} ×{" "}
+                {formatMoney(booking.ticketPrice)}
               </span>
-              <span>{formatMoney(booking.totalSeats * booking.ticketPrice)}</span>
+
+              <span>
+                {formatMoney(
+                  booking.totalSeats * booking.ticketPrice
+                )}
+              </span>
             </div>
+
             {(booking.foodTotal ?? 0) > 0 && (
               <div className="flex justify-between text-muted">
                 <span>Food & beverages</span>
-                <span>{formatMoney(booking.foodTotal ?? 0)}</span>
+                <span>
+                  {formatMoney(booking.foodTotal ?? 0)}
+                </span>
               </div>
             )}
+
             {(booking.discountAmount ?? 0) > 0 && (
               <div className="flex justify-between text-emerald-300">
-                <span>Discount{booking.offer?.code ? ` (${booking.offer.code})` : ""}</span>
-                <span>− {formatMoney(booking.discountAmount ?? 0)}</span>
+                <span>
+                  Discount
+                  {booking.offer?.code
+                    ? ` (${booking.offer.code})`
+                    : ""}
+                </span>
+
+                <span>
+                  − {formatMoney(booking.discountAmount ?? 0)}
+                </span>
               </div>
             )}
+
             <div className="flex items-baseline justify-between pt-2">
               <span className="font-bold">Total</span>
-              <span className="text-2xl font-extrabold">{formatMoney(booking.finalAmount)}</span>
+
+              <span className="text-2xl font-extrabold">
+                {formatMoney(booking.finalAmount)}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="relative flex flex-col items-center justify-center gap-4 border-t border-dashed border-line bg-card/50 p-6 text-center lg:border-l lg:border-t-0">
-          <span aria-hidden="true" className="absolute -top-3 left-1/2 hidden size-6 -translate-x-1/2 rounded-full bg-bg max-lg:block" />
-          <span aria-hidden="true" className="absolute -left-3 top-1/2 hidden size-6 -translate-y-1/2 rounded-full bg-bg lg:block" />
+        {/* QR code and booking ID */}
+        <div className="relative flex min-w-0 flex-col items-center justify-center gap-4 border-t border-dashed border-line bg-card/50 p-6 text-center lg:border-l lg:border-t-0">
+          <span
+            aria-hidden="true"
+            className="absolute -top-3 left-1/2 hidden size-6 -translate-x-1/2 rounded-full bg-bg max-lg:block"
+          />
+
+          <span
+            aria-hidden="true"
+            className="absolute -left-3 top-1/2 hidden size-6 -translate-y-1/2 rounded-full bg-bg lg:block"
+          />
 
           {ticketConfirmed ? (
             <div className="rounded-2xl bg-white p-3">
-              <QRCodeSVG value={qrValue} size={160} level="M" aria-label={`QR code for booking ${booking.bookingCode}`} />
+              <QRCodeSVG
+                value={qrValue}
+                size={160}
+                level="M"
+                aria-label={`QR code for booking ${booking.bookingCode}`}
+              />
             </div>
           ) : (
             <p className="max-w-52 text-sm text-muted">
@@ -152,11 +235,18 @@ export default function TicketCard({ booking }: { booking: BookingTicket }) {
             </p>
           )}
 
-          <div>
-            <p className="text-xs text-muted">Booking ID</p>
-            <p className="mt-1 text-2xl font-extrabold tracking-wider">{booking.bookingCode}</p>
+          {/* Booking ID - fixed size and wrapping */}
+          <div className="w-full min-w-0 px-2">
+            <p className="text-xs text-muted">
+              Booking ID
+            </p>
+
+            <p className="mt-2 w-full break-all text-center text-sm font-bold leading-6 tracking-normal text-white sm:text-base">
+              {booking.bookingCode}
+            </p>
           </div>
 
+          {/* Copy booking ID */}
           <button
             type="button"
             onClick={copyCode}

@@ -6,7 +6,10 @@ import type {
 } from "../types/api";
 
 const PAYMENT_SESSION_KEY = "movie-booking-pending-payment";
-const ORDER_ID_PATTERN = /^PH-BK-[A-Z0-9]{6}-[1-3]$/i;
+const ORDER_ID_PATTERN =
+  /^PH-BK-(?:[A-HJ-NP-Z2-9]{6}|[A-HJ-NP-Z2-9]{26})-[1-3]$/i;
+const BOOKING_CODE_PATTERN =
+  /^BK-(?:[A-HJ-NP-Z2-9]{6}|[A-HJ-NP-Z2-9]{26})$/i;
 const SANDBOX_CHECKOUT_URL = "https://sandbox.payhere.lk/pay/checkout";
 
 export const isValidPaymentOrderId = (orderId: string): boolean =>
@@ -101,7 +104,7 @@ export const getPendingPaymentSession = (): PendingPaymentSession | null => {
       !("showtimeId" in value) ||
       !("seatIds" in value) ||
       typeof value.bookingCode !== "string" ||
-      !/^BK-[A-HJ-NP-Z2-9]{6}$/i.test(value.bookingCode) ||
+      !BOOKING_CODE_PATTERN.test(value.bookingCode) ||
       typeof value.paymentToken !== "string" ||
       !/^[a-f0-9]{64}$/i.test(value.paymentToken) ||
       typeof value.holdExpiresAt !== "string" ||

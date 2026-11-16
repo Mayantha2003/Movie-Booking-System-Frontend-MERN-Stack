@@ -17,7 +17,12 @@ const api = axios.create({
   },
 });
 
-const AUTH_URLS = ["/auth/login", "/auth/register", "/auth/refresh"];
+const AUTH_URLS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/logout",
+];
 const isAuthUrl = (url = ""): boolean => AUTH_URLS.some((path) => url.includes(path));
 
 const getSentToken = (config?: InternalAxiosRequestConfig): string | null => {

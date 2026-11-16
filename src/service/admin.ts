@@ -1,5 +1,6 @@
 import api from "./api";
 import type {
+  AdminAnalytics,
   AdminStats,
   AdminUser,
   ApiResponse,
@@ -28,6 +29,12 @@ const resource = <T>(path: string) => ({
 export const getAdminStats = () =>
   api.get<ApiResponse<AdminStats>>("/admin/stats").then(body);
 
+export const getAdminAnalytics = (from: string, to: string) =>
+  api
+    .get<ApiResponse<AdminAnalytics>>("/admin/analytics", {
+      params: { from, to },
+    })
+    .then(body);
 export const getMovies = () => api.get<ApiResponse<Movie[]>>("/admin/movies").then(body);
 export const getFoods = () => api.get<ApiResponse<Food[]>>("/admin/foods").then(body);
 export const getOffers = () => api.get<ApiResponse<Offer[]>>("/admin/offers").then(body);

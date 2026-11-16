@@ -20,6 +20,7 @@ export interface FormField {
   label: string;
   type: FormFieldType;
   required?: boolean;
+  requiredOnCreate?: boolean;
   optional?: boolean;
   half?: boolean;
   hint?: string;
@@ -80,7 +81,8 @@ export const validateFields = (fields: FormField[], values: FormValues, editing:
 
     if (f.type === "checkbox") continue;
 
-    if (f.required && (isEmpty(v) || (typeof v === "string" && !v.trim()))) {
+    const required = f.required || (f.requiredOnCreate && !editing);
+    if (required && (isEmpty(v) || (typeof v === "string" && !v.trim()))) {
       errors[f.name] = `${f.label} is required.`;
       continue;
     }

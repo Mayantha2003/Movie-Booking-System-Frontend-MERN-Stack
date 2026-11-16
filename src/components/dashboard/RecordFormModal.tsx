@@ -89,7 +89,7 @@ export default function RecordFormModal({
                   key={f.name}
                   label={f.label}
                   kind={f.kind}
-                  optional={!f.required}
+                  optional={!f.required && !(f.requiredOnCreate && !editing)}
                   hint={f.hint}
                   error={typeof errors[f.name] === "string" ? errors[f.name] : undefined}
                   value={imageValue}
@@ -111,7 +111,7 @@ export default function RecordFormModal({
                 label={f.label}
                 type={type}
                 options={options}
-                optional={!f.required && !isCheckbox}
+                optional={!f.required && !(f.requiredOnCreate && !editing) && !isCheckbox}
                 hint={f.hint ?? (f.type === "list" ? "Separate items with commas." : undefined)}
                 error={typeof errors[f.name] === "string" ? errors[f.name] : undefined}
                 placeholder={f.placeholder}

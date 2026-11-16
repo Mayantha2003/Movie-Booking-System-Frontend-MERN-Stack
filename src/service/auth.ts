@@ -1,5 +1,10 @@
 import api from "./api";
-import { clearTokens, getRefreshToken, startSession } from "./tokenStorage";
+import {
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  startSession,
+} from "./tokenStorage";
 import { normalizeRole } from "../utils/roles";
 import type {
   ApiResponse,
@@ -47,7 +52,27 @@ export const login = async (
 };
 
 export const logout = (): void => {
+  const accessToken = getAccessToken();
+  const refreshToken = getRefreshToken();
   clearTokens();
+
+  if (!accessToken && !refreshToken) return;
+
+  void api
+    .post(
+      "/auth/logout",
+      { refreshToken },
+      {
+        skipAuth: true,
+        skipAuthRefresh: true,
+        ...(accessToken
+          ? { headers: { Authorization: `Bearer ${accessToken}` } }
+          : {}),
+      }
+    )
+    .catch(() => {
+      console.error("Server-side token revocation failed during logout.");
+    });
 };
 
 export const getMyDetails = async (): Promise<ApiResponse<MeData>> => {

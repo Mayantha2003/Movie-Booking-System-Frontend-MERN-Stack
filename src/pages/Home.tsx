@@ -11,6 +11,7 @@ import { LoadingState, ErrorState } from "../components/common/StateViews";
 import { getNowShowing, getComingSoon } from "../service/movie";
 import type { Movie } from "../types/api";
 import type { MovieCardItem } from "../components/movie/MovieCard";
+import AiPicks from "../components/home/AiPicks";
 
 const mapMovie = (movie: Movie): MovieCardItem => ({
   ...movie,
@@ -90,6 +91,9 @@ const Home = () => {
           <QuickBook movies={filteredNowShowing} />
           <main className="mx-auto max-w-7xl px-4 sm:px-6">
             <NowShowing movies={filteredNowShowing} />
+          </main>
+          <main className="mx-auto max-w-7xl px-4 sm:px-6"> 
+            <AiPicks />
           </main>
           <ComingSoon movies={filteredComingSoon} />
         </>

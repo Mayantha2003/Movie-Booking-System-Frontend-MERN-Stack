@@ -15,7 +15,8 @@ import {
 } from "../service/payment";
 import type { PaymentStatusResponse } from "../types/api";
 
-const ORDER_BOOKING_CODE = /^PH-(BK-[A-Z0-9]{6})-[1-3]$/i;
+const ORDER_BOOKING_CODE =
+  /^PH-(BK-(?:[A-HJ-NP-Z2-9]{6}|[A-HJ-NP-Z2-9]{26}))-[1-3]$/i;
 const MAX_STATUS_CHECKS = 15;
 const STATUS_POLL_INTERVAL_MS = 2_000;
 

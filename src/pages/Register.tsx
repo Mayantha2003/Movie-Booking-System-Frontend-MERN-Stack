@@ -68,12 +68,9 @@ const Register = () => {
       first_name: values.first_name.trim(),
       last_name: values.last_name.trim(),
       username: values.username.trim(),
+      email: values.email.trim(),
       password: values.password,
     };
-
-    if (values.email.trim()) {
-      payload.email = values.email.trim();
-    }
 
     if (values.phone.trim()) {
       payload.phone = values.phone.trim();
@@ -173,7 +170,7 @@ const Register = () => {
 
         <div className="grid gap-2 sm:grid-cols-2">
           <FormField
-            label="Email (optional)"
+            label="Email"
             name="email"
             type="email"
             autoComplete="email"
@@ -205,7 +202,7 @@ const Register = () => {
               value={values.password}
               onChange={handleChange}
               error={errors.password}
-              hint="At least 8 characters."
+              hint="8–72 bytes, including at least one letter and one number."
             />
 
             <FormField

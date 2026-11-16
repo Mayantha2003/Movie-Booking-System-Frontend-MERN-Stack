@@ -72,7 +72,7 @@ export default function CreateAdminModal({ onClose, onCreated }: CreateAdminModa
         <Field label="Phone" name="phone" type="tel" optional value={values.phone} onChange={handleChange}
           error={errors.phone} autoComplete="off" placeholder="+94 77 123 4567" />
         <Field label="Password" name="password" type="password" value={values.password} onChange={handleChange}
-          error={errors.password} autoComplete="new-password" hint="At least 8 characters." />
+          error={errors.password} autoComplete="new-password" hint="8–72 bytes, including at least one letter and one number." />
 
         <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={submitting}

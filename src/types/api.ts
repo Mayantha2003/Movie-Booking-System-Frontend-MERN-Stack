@@ -189,6 +189,25 @@ export interface Booking {
   updatedAt: string;
 }
 
+export interface BookingConfirmation {
+  bookingCode: string;
+  guestInfo?: Pick<GuestInfo, "name">;
+  showtime: Pick<Showtime, "_id" | "showDate" | "startTime"> &
+    Partial<Pick<Showtime, "ticketPrice">>;
+  movie: MovieRef;
+  cinema: CinemaRef;
+  screen?: ScreenRef;
+  seats: Array<Pick<BookedSeat, "seatId">>;
+  totalSeats: number;
+  ticketPrice: number;
+  foodTotal?: number;
+  discountAmount?: number;
+  offer?: Pick<Offer, "code"> | null;
+  finalAmount: number;
+  paymentStatus: PaymentStatus;
+  bookingStatus: BookingStatus;
+}
+
 export interface CreateBookingPayload {
   showtimeId: string;
   seats: BookedSeat[];
@@ -242,6 +261,47 @@ export interface AdminStats {
   recentBookings: Booking[];
 }
 
+export interface AdminAnalyticsSummary {
+  totalBookings: number;
+  paidBookings: number;
+  pendingBookings: number;
+  cancelledBookings: number;
+  failedPayments: number;
+  ticketsSold: number;
+  revenue: number;
+}
+
+export interface RevenueTrendItem {
+  date: string;
+  bookings: number;
+  revenue: number;
+}
+
+export interface PopularMovieItem {
+  movieId: string;
+  title: string;
+  bookings: number;
+  ticketsSold: number;
+  revenue: number;
+}
+
+export interface AnalyticsStatusItem {
+  status: string;
+  count: number;
+}
+
+export interface AdminAnalytics {
+  period: {
+    from: string;
+    to: string;
+  };
+  summary: AdminAnalyticsSummary;
+  revenueTrend: RevenueTrendItem[];
+  popularMovies: PopularMovieItem[];
+  bookingStatuses: AnalyticsStatusItem[];
+  paymentStatuses: AnalyticsStatusItem[];
+}
+
 export interface SuperAdminStats {
   admins: number;
   users: number;
@@ -264,4 +324,12 @@ export interface UploadedImage {
   path: string;
 }
 
+export interface MovieRecommendation {
+  movie: Movie;
+  reason: string;
+}
+
+export interface RecommendationResponse extends ApiResponse<MovieRecommendation[]> {
+  source: "ai" | "fallback" | "none";
+}
 export type Payload = Record<string, unknown>;

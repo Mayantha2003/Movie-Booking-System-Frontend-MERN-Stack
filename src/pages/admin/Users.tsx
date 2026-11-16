@@ -20,9 +20,9 @@ const fields: FormField[] = [
   { name: "first_name", label: "First name", type: "text", required: true, half: true },
   { name: "last_name", label: "Last name", type: "text", required: true, half: true },
   { name: "username", label: "Username", type: "text", required: true, half: true, lockOnEdit: true, hint: "At least 3 characters. Cannot be changed later." },
-  { name: "email", label: "Email", type: "email", half: true },
+  { name: "email", label: "Email", type: "email", requiredOnCreate: true, half: true },
   { name: "phone", label: "Phone", type: "tel", half: true, placeholder: "+94 77 123 4567" },
-  { name: "password", label: "Password", type: "password", required: true, half: true, createOnly: true, hint: "At least 8 characters." },
+  { name: "password", label: "Password", type: "password", required: true, half: true, createOnly: true, hint: "8–72 bytes, including at least one letter and one number." },
 ];
 
 const StatusBadge = ({ status }: { status: UserStatus }) =>
@@ -97,11 +97,16 @@ const renderView = (u: UserRow, close: () => void) => (
 const validate = (v: Record<string, unknown>, editing: boolean) => {
   const errors: Record<string, string> = {};
   const username = String(v.username ?? "").trim();
+  const email = String(v.email ?? "").trim();
   const phone = String(v.phone ?? "").trim();
   const password = String(v.password ?? "");
   if (username.length < 3) errors.username = "Username must be at least 3 characters.";
+  if (!editing && !email) errors.email = "Email is required.";
+  else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email address.";
   if (phone && !PHONE.test(phone)) errors.phone = "Enter a valid phone number.";
-  if (!editing && password.length < 8) errors.password = "Password must be at least 8 characters.";
+  if (!editing && (!/^(?=.*[A-Za-z])(?=.*[0-9]).{8,}$/.test(password) || new TextEncoder().encode(password).length > 72)) {
+    errors.password = "Use 8–72 bytes with at least one letter and one number.";
+  }
   return errors;
 };
 
