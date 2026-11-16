@@ -5,6 +5,7 @@ import BookingShell from "../components/booking/BookingShell";
 import Button from "../components/common/Button";
 import { getErrorMessage } from "../service/errorMessage";
 import {
+  clearPendingPaymentSession,
   getPendingPaymentSession,
   submitDemoCardPayment,
 } from "../service/payment";
@@ -61,33 +62,48 @@ export default function DemoCardPayment() {
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError("");
+  event.preventDefault();
+  setError("");
 
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
+  const validationError = validateForm();
+
+  if (validationError) {
+    setError(validationError);
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await submitDemoCardPayment({
+      bookingCode,
+      paymentToken,
+    });
+
+    if (
+      response.bookingStatus !== "Confirmed" &&
+      response.bookingStatus !== "Completed"
+    ) {
+      throw new Error("Payment was not confirmed. Please try again.");
     }
 
-    setLoading(true);
+    clearPendingPaymentSession(bookingCode);
 
-    try {
-  const response = await submitDemoCardPayment({
-    bookingCode,
-    paymentToken,
-  });
-
-      const safeOrderId = response.orderId || `${bookingCode}-demo`;
-      navigate(`/payment/return?order_id=${encodeURIComponent(safeOrderId)}`);
-    } catch (submitError) {
-      setError(
-        getErrorMessage(submitError, "Your demo payment could not be processed. Please try again.")
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    navigate(
+      `/booking/confirmation/${encodeURIComponent(bookingCode)}`,
+      { replace: true }
+    );
+  } catch (submitError) {
+    setError(
+      getErrorMessage(
+        submitError,
+        "Your demo payment could not be processed. Please try again."
+      )
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleCardNumberChange = (event: ChangeEvent<HTMLInputElement>) => {
     setCardNumber(formatCardNumber(event.target.value));
