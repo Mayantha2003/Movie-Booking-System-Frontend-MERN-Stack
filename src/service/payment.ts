@@ -75,6 +75,7 @@ export const savePendingPaymentSession = (
   );
 };
 
+
 export const getPendingPaymentSession =
   (): PendingPaymentSession | null => {
     if (!sessionStorageAvailable()) return null;
@@ -83,52 +84,25 @@ export const getPendingPaymentSession =
       const stored = window.sessionStorage.getItem(PAYMENT_SESSION_KEY);
       if (!stored) return null;
 
-      const value: unknown = JSON.parse(stored);
+      const value = JSON.parse(stored) as PendingPaymentSession;
 
       if (
-        typeof value !== "object" ||
-        value === null ||
-        !("bookingCode" in value) ||
-        !("paymentToken" in value) ||
-        !("holdExpiresAt" in value) ||
-        !("showtimeId" in value) ||
-        !("seatIds" in value) ||
+        !value ||
         typeof value.bookingCode !== "string" ||
-        !BOOKING_CODE_PATTERN.test(value.bookingCode) ||
         typeof value.paymentToken !== "string" ||
-        !/^[a-f0-9]{64}$/i.test(value.paymentToken) ||
         typeof value.holdExpiresAt !== "string" ||
         typeof value.showtimeId !== "string" ||
-        !Array.isArray(value.seatIds) ||
-        value.seatIds.length === 0 ||
-        !value.seatIds.every(
-          (seatId: unknown) => typeof seatId === "string"
-        )
+        !Array.isArray(value.seatIds)
       ) {
-        clearPendingPaymentSession();
         return null;
       }
 
-      if (
-        !Number.isFinite(Date.parse(value.holdExpiresAt)) ||
-        Date.parse(value.holdExpiresAt) <= Date.now()
-      ) {
-        clearPendingPaymentSession();
-        return null;
-      }
-
-      return {
-        bookingCode: value.bookingCode,
-        paymentToken: value.paymentToken,
-        holdExpiresAt: value.holdExpiresAt,
-        showtimeId: value.showtimeId,
-        seatIds: value.seatIds,
-      };
+      return value;
     } catch {
-      clearPendingPaymentSession();
       return null;
     }
   };
+
 
 export const clearPendingPaymentSession = (
   bookingCode?: string
