@@ -1,6 +1,5 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-
 import BookingShell from "../components/booking/BookingShell";
 import Button from "../components/common/Button";
 import { getErrorMessage } from "../service/errorMessage";
