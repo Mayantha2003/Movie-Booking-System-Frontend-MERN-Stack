@@ -73,14 +73,10 @@ export default function DemoCardPayment() {
     setLoading(true);
 
     try {
-      const response = await submitDemoCardPayment({
-        bookingCode,
-        paymentToken,
-        cardHolderName,
-        cardNumber: cardNumber.replace(/\s+/g, ""),
-        expiry,
-        cvv,
-      });
+  const response = await submitDemoCardPayment({
+    bookingCode,
+    paymentToken,
+  });
 
       const safeOrderId = response.orderId || `${bookingCode}-demo`;
       navigate(`/payment/return?order_id=${encodeURIComponent(safeOrderId)}`);
